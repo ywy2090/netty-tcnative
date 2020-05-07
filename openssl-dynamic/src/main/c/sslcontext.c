@@ -920,7 +920,417 @@ cleanup:
 #endif // OPENSSL_IS_BORINGSSL
 }
 
-TCN_IMPLEMENT_CALL(void, SSLContext, setNpnProtos0)(TCN_STDARGS, jlong ctx, jbyteArray next_protos,
+TCN_IMPLEMENT_CALL(jboolean, SSLContext, setCertificateExt)(TCN_STDARGS, jlong ctx,
+                                                         jstring enccert, jstring enckey,
+                                                         jstring signcert, jstring signkey,
+                                                         jstring password)
+{
+    tcn_ssl_ctxt_t *c = J2P(ctx, tcn_ssl_ctxt_t *);
+
+    TCN_CHECK_NULL(c, ctx, JNI_FALSE);
+
+    jboolean rv = JNI_TRUE;
+    TCN_ALLOC_CSTRING(enccert);
+    TCN_ALLOC_CSTRING(enckey);
+	TCN_ALLOC_CSTRING(signcert);
+    TCN_ALLOC_CSTRING(signkey);
+    TCN_ALLOC_CSTRING(password);
+
+    // EVP_PKEY *penckey = NULL;
+    // X509 *xenccert = NULL;
+	// EVP_PKEY *psignkey = NULL;
+    // X509 *xsigncert = NULL;
+
+    const char *enc_key_file, *enc_cert_file;
+	const char *sign_key_file, *sign_cert_file;
+    // const char *p;
+    char *old_password = NULL;
+    char err[256];
+
+    // UNREFERENCED(o);
+
+	enc_key_file  = J2S(enckey);
+    enc_cert_file = J2S(enccert);
+	sign_key_file  = J2S(signkey);
+    sign_cert_file = J2S(signcert);
+
+	if (!enc_key_file && !enc_cert_file && !sign_key_file && !sign_cert_file) {
+        tcn_Throw(e, "Please specific key and certificate");
+        rv = JNI_FALSE;
+        goto cleanup;
+	}
+
+    if (J2S(password)) {
+        old_password = c->password;
+
+        c->password = strdup(cpassword);
+        if (c->password == NULL) {
+            rv = JNI_FALSE;
+            goto cleanup;
+        }
+    }
+
+    if (!enc_key_file)
+        enc_key_file = enc_cert_file;
+    if (!enc_key_file || !enc_cert_file) {
+        tcn_Throw(e, "No encrypt certificate file specified or invalid file format");
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+
+    if (!sign_key_file)
+        sign_key_file = sign_cert_file;
+    if (!sign_key_file || !sign_cert_file) {
+        tcn_Throw(e, "No signature certificate file specified or invalid file format");
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+    if (SSL_CTX_use_certificate_chain_file(c->ctx, sign_cert_file)<=0)
+    {
+        ERR_error_string(ERR_get_error(), err);
+        tcn_Throw(e, "Error setting connect certificate (%s)", err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+    if(SSL_CTX_use_PrivateKey_file(c->ctx, sign_key_file,SSL_FILETYPE_PEM)<=0)
+    {
+        ERR_error_string(ERR_get_error(), err);
+        tcn_Throw(e, "Error setting connect key (%s)", err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+    if (SSL_CTX_use_certificate_file(c->ctx, enc_cert_file,SSL_FILETYPE_PEM)<=0)
+    {
+        ERR_error_string(ERR_get_error(), err);
+        tcn_Throw(e, "Error setting enc certificate (%s)", err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+    if(SSL_CTX_use_enc_PrivateKey_file(c->ctx, enc_key_file,SSL_FILETYPE_PEM)<=0)
+    {
+        ERR_error_string(ERR_get_error(), err);
+        tcn_Throw(e, "Error setting enc key (%s)", err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+#if 0
+	// encrypt certificate
+    if ((p = strrchr(enc_cert_file, '.')) != NULL && strcmp(p, ".pkcs12") == 0) {
+        if (!ssl_load_pkcs12(c, enc_cert_file, &penckey, &xenccert, 0)) {
+            ERR_error_string(ERR_get_error(), err);
+            tcn_Throw(e, "Unable to load encrypt certificate %s (%s)",
+                      enc_cert_file, err);
+            rv = JNI_FALSE;
+            goto cleanup;
+        }
+    }
+    else {
+        if ((penckey = load_pem_key(c, enc_key_file)) == NULL) {
+            ERR_error_string(ERR_get_error(), err);
+            tcn_Throw(e, "Unable to load encrypt certificate key %s (%s)",
+                      enc_key_file, err);
+            rv = JNI_FALSE;
+            goto cleanup;
+        }
+        if ((xenccert = load_pem_cert(c, enc_cert_file)) == NULL) {
+            ERR_error_string(ERR_get_error(), err);
+            tcn_Throw(e, "Unable to load encrypt certificate %s (%s)",
+                      enc_cert_file, err);
+            rv = JNI_FALSE;
+            goto cleanup;
+        }
+    }
+
+	// signature certificate
+	if ((p = strrchr(sign_cert_file, '.')) != NULL && strcmp(p, ".pkcs12") == 0) {
+        if (!ssl_load_pkcs12(c, sign_cert_file, &psignkey, &xsigncert, 0)) {
+            ERR_error_string(ERR_get_error(), err);
+            tcn_Throw(e, "Unable to load signature certificate %s (%s)",
+                      sign_cert_file, err);
+            rv = JNI_FALSE;
+            goto cleanup;
+        }
+    }
+    else {
+        if ((psignkey = load_pem_key(c, sign_key_file)) == NULL) {
+            ERR_error_string(ERR_get_error(), err);
+            tcn_Throw(e, "Unable to load signature certificate key %s (%s)",
+                      sign_key_file, err);
+            rv = JNI_FALSE;
+            goto cleanup;
+        }
+        if ((xsigncert = load_pem_cert(c, sign_cert_file)) == NULL) {
+            ERR_error_string(ERR_get_error(), err);
+            tcn_Throw(e, "Unable to load signature certificate %s (%s)",
+                      sign_cert_file, err);
+            rv = JNI_FALSE;
+            goto cleanup;
+        }
+    }
+
+	if (SSL_CTX_use_certificate_ext(c->ctx, xenccert, xsigncert) <= 0) {
+        ERR_error_string(ERR_get_error(), err);
+        tcn_Throw(e, "Error setting certificate ext (%s)", err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+    if (SSL_CTX_use_PrivateKey_ext(c->ctx, penckey, psignkey) <= 0) {
+        ERR_error_string(ERR_get_error(), err);
+        tcn_Throw(e, "Error setting private key ext (%s)", err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+
+	if (SSL_CTX_check_private_key_ext(c->ctx) <= 0) {
+        ERR_error_string(ERR_get_error(), err);
+        tcn_Throw(e, "Private key ext does not match the certificate public key (%s)",
+                  err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+#endif
+cleanup:
+    TCN_FREE_CSTRING(enccert);
+    TCN_FREE_CSTRING(enckey);
+	TCN_FREE_CSTRING(signcert);
+    TCN_FREE_CSTRING(signkey);
+    TCN_FREE_CSTRING(password);
+    // EVP_PKEY_free(penckey); // this function is safe to call with NULL
+    // X509_free(xenccert); // this function is safe to call with NULL
+    // EVP_PKEY_free(psignkey); // this function is safe to call with NULL
+    // X509_free(xsigncert); // this function is safe to call with NULL
+    free_and_reset_pass(c, old_password, rv);
+    return rv;
+}
+
+TCN_IMPLEMENT_CALL(jboolean, SSLContext, setCertificateExtBio)(TCN_STDARGS, jlong ctx,
+                                                         jlong enccert, jlong enckey,
+                                                         jlong signcert, jlong signkey,
+                                                         jstring password)
+{
+    tcn_ssl_ctxt_t *c = J2P(ctx, tcn_ssl_ctxt_t *);
+
+    TCN_CHECK_NULL(c, ctx, JNI_FALSE);
+
+    BIO *enc_cert_bio = J2P(enccert, BIO *);
+    BIO *enc_key_bio = J2P(enckey, BIO *);
+	BIO *sign_cert_bio = J2P(signcert, BIO *);
+    BIO *sign_key_bio = J2P(signkey, BIO *);
+    EVP_PKEY *penckey = NULL;
+    X509 *xenccert = NULL;
+	EVP_PKEY *psignkey = NULL;
+	X509 *xsigncert = NULL;
+
+    jboolean rv = JNI_TRUE;
+    TCN_ALLOC_CSTRING(password);
+    char *old_password = NULL;
+    char err[256];
+
+    // UNREFERENCED(o);
+
+	if (!enccert && !enckey && !signcert && !signkey) {
+		tcn_Throw(e, "Please specific key and certificate");
+        rv = JNI_FALSE;
+		goto cleanup;
+	}
+
+    if (J2S(password)) {
+        old_password = c->password;
+
+        c->password = strdup(cpassword);
+        if (c->password == NULL) {
+            rv = JNI_FALSE;
+            goto cleanup;
+        }
+    }
+
+    if (!enckey)
+        enckey = enccert;
+    if (!enccert || !enckey) {
+        tcn_Throw(e, "No encrypt certificate file specified or invalid file format");
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+
+	if (!signkey)
+        signkey = signcert;
+    if (!signcert || !signkey) {
+        tcn_Throw(e, "No signature certificate file specified or invalid file format");
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+
+	// encrypt certificate
+    if ((penckey = PEM_read_bio_PrivateKey(enc_key_bio, NULL, NULL, NULL)) == NULL) {
+        ERR_error_string(ERR_get_error(), err);
+        ERR_clear_error();
+        tcn_Throw(e, "Unable to load encrypt certificate key (%s)",err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+    if ((xenccert = PEM_read_bio_X509(enc_cert_bio, NULL, NULL, NULL)) == NULL) {
+        ERR_error_string(ERR_get_error(), err);
+        ERR_clear_error();
+        tcn_Throw(e, "Unable to load encrypt certificate (%s) ", err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+
+	// signature certificate
+    if ((psignkey = PEM_read_bio_PrivateKey(sign_key_bio, NULL, NULL, NULL)) == NULL) {
+        ERR_error_string(ERR_get_error(), err);
+        ERR_clear_error();
+        tcn_Throw(e, "Unable to load signature certificate key (%s)",err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+    if ((xsigncert = PEM_read_bio_X509(sign_cert_bio, NULL, NULL, NULL)) == NULL) {
+        ERR_error_string(ERR_get_error(), err);
+        ERR_clear_error();
+        tcn_Throw(e, "Unable to load signature certificate (%s) ", err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+
+    if (SSL_CTX_use_certificate(c->ctx, xsigncert) <= 0) {
+        ERR_error_string(ERR_get_error(), err);
+        ERR_clear_error();
+        tcn_Throw(e, "Error setting certificate ext (%s)", err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+    if (SSL_CTX_use_PrivateKey(c->ctx, psignkey) <= 0) {
+        ERR_error_string(ERR_get_error(), err);
+        ERR_clear_error();
+        tcn_Throw(e, "Error setting private key ext (%s)", err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+    if (SSL_CTX_use_certificate(c->ctx, xenccert) <= 0) {
+        ERR_error_string(ERR_get_error(), err);
+        ERR_clear_error();
+        tcn_Throw(e, "Error setting certificate ext (%s)", err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+    if (SSL_CTX_use_enc_PrivateKey(c->ctx, penckey) <= 0) {
+        ERR_error_string(ERR_get_error(), err);
+        ERR_clear_error();
+        tcn_Throw(e, "Error setting private key ext (%s)", err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+    // certificate chain https://stackoverflow.com/questions/3810058/read-certificate-files-from-memory-instead-of-a-file-using-openssl
+    // if (SSL_CTX_check_private_key_ext(c->ctx) <= 0) {
+    //     ERR_error_string(ERR_get_error(), err);
+    //     ERR_clear_error();
+
+    //     tcn_Throw(e, "Private key ext does not match the certificate public key (%s)",
+    //               err);
+    //     rv = JNI_FALSE;
+    //     goto cleanup;
+    // }
+cleanup:
+    TCN_FREE_CSTRING(password);
+    EVP_PKEY_free(penckey); // this function is safe to call with NULL
+    X509_free(xenccert); // this function is safe to call with NULL
+    EVP_PKEY_free(psignkey); // this function is safe to call with NULL
+    X509_free(xsigncert); // this function is safe to call with NULL
+    free_and_reset_pass(c, old_password, rv);
+    return rv;
+}
+
+// Convert protos to wire format
+static int initProtocols(JNIEnv *e, unsigned char **proto_data,
+            unsigned int *proto_len, jobjectArray protos) {
+    int i;
+    unsigned char *p_data = NULL;
+    unsigned char *p_data_tmp = NULL;
+
+    // We start with allocate 128 bytes which should be good enough for most use-cases while still be pretty low.
+    // We will call realloc to increase this if needed.
+    size_t p_data_size = 128;
+    size_t p_data_len = 0;
+    jstring proto_string = NULL;
+    const char *proto_chars = NULL;
+    size_t proto_chars_len;
+    int cnt;
+
+    if (protos == NULL) {
+        // Guard against NULL protos.
+        return -1;
+    }
+
+    cnt = (*e)->GetArrayLength(e, protos);
+
+    if (cnt == 0) {
+        // if cnt is 0 we not need to continue and can just fail fast.
+        return -1;
+    }
+
+    p_data = (unsigned char *) OPENSSL_malloc(p_data_size);
+    if (p_data == NULL) {
+        // Not enough memory?
+        return -1;
+    }
+
+    for (i = 0; i < cnt; ++i) {
+         proto_string = (jstring) (*e)->GetObjectArrayElement(e, protos, i);
+         proto_chars = (*e)->GetStringUTFChars(e, proto_string, JNI_FALSE);
+
+         proto_chars_len = strlen(proto_chars);
+         if (proto_chars_len > 0 && proto_chars_len <= MAX_ALPN_NPN_PROTO_SIZE) {
+            // We need to add +1 as each protocol is prefixed by it's length (unsigned char).
+            // For all except of the last one we already have the extra space as everything is
+            // delimited by ','.
+            p_data_len += 1 + proto_chars_len;
+            if (p_data_len > p_data_size) {
+                // double size
+                p_data_size <<= 1;
+                p_data_tmp = realloc(p_data, p_data_size);
+                if (p_data_tmp == NULL) {
+                    // Not enough memory?
+                    (*e)->ReleaseStringUTFChars(e, proto_string, proto_chars);
+
+                    // If realloc failed we need to still free the original pointer to ensure we not leak any memory.
+                    // See https://linux.die.net/man/3/realloc
+                    OPENSSL_free(p_data);
+                    p_data = NULL;
+                    break;
+                } else {
+                    p_data = p_data_tmp;
+                    p_data_tmp = NULL;
+                }
+            }
+            // Write the length of the protocol and then increment before memcpy the protocol itself.
+            *p_data = proto_chars_len;
+            ++p_data;
+            memcpy(p_data, proto_chars, proto_chars_len);
+            p_data += proto_chars_len;
+         }
+
+         // Release the string to prevent memory leaks
+         (*e)->ReleaseStringUTFChars(e, proto_string, proto_chars);
+    }
+
+    if (p_data == NULL) {
+        // Something went wrong so update the proto_len and return -1
+        *proto_len = 0;
+        return -1;
+    } else {
+        if (*proto_data != NULL) {
+            // Free old data
+            OPENSSL_free(*proto_data);
+        }
+        // Decrement pointer again as we incremented it while creating the protocols in wire format.
+        p_data -= p_data_len;
+        *proto_data = p_data;
+        *proto_len = p_data_len;
+        return 0;
+    }
+}
+
+TCN_IMPLEMENT_CALL(void, SSLContext, setNpnProtos)(TCN_STDARGS, jlong ctx, jobjectArray next_protos,
         jint selectorFailureBehavior)
 {
     tcn_ssl_ctxt_t *c = J2P(ctx, tcn_ssl_ctxt_t *);
@@ -1294,7 +1704,7 @@ TCN_IMPLEMENT_CALL(void, SSLContext, setSessionTicketKeys0)(TCN_STDARGS, jlong c
         tcn_ThrowException(e, "OPENSSL_malloc() returned null");
         return;
     }
-    
+
     for (i = 0; i < cnt; ++i) {
         key = b + (SSL_SESSION_TICKET_KEY_SIZE * i);
         memcpy(ticket_keys[i].key_name, key, 16);
@@ -1343,7 +1753,7 @@ tcn_ssl_task_t* tcn_ssl_task_new(JNIEnv* e, jobject task) {
     if (sslTask == NULL) {
         return NULL;
     }
-    
+
     if ((sslTask->task = (*e)->NewGlobalRef(e, task)) == NULL) {
         // NewGlobalRef failed because we ran out of memory, free what we malloc'ed and fail the handshake.
         OPENSSL_free(sslTask);
@@ -1900,7 +2310,7 @@ TCN_IMPLEMENT_CALL(void, SSLContext, setCertRequestedCallback)(TCN_STDARGS, jlon
             tcn_throwOutOfMemoryError(e, "Unable to allocate memory for global reference");
             return;
         }
-       
+
         c->cert_requested_callback = cb;
         c->cert_requested_callback_method = method;
 
@@ -2044,7 +2454,7 @@ TCN_IMPLEMENT_CALL(void, SSLContext, setCertificateCallback)(TCN_STDARGS, jlong 
 
         SSL_CTX_set_cert_cb(c->ctx, certificate_cb, NULL);
     }
-        
+
     if (oldCallback != NULL) {
         (*e)->DeleteGlobalRef(e, oldCallback);
      }
@@ -2298,10 +2708,6 @@ TCN_IMPLEMENT_CALL(void, SSLContext, setPrivateKeyMethod0)(TCN_STDARGS, jlong ct
     if (oldMethod != NULL) {
         (*e)->DeleteGlobalRef(e, oldMethod);
     }
-
-error:
-    free(name);
-    free(combinedName);
 #else
     tcn_ThrowException(e, "Requires BoringSSL");
 #endif // OPENSSL_IS_BORINGSSL
@@ -2647,8 +3053,10 @@ static const JNINativeMethod fixed_method_table[] = {
   { TCN_METHOD_TABLE_ENTRY(setVerify, (JII)V, SSLContext) },
   { TCN_METHOD_TABLE_ENTRY(setCertificate, (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z, SSLContext) },
   { TCN_METHOD_TABLE_ENTRY(setCertificateBio, (JJJLjava/lang/String;)Z, SSLContext) },
-  { TCN_METHOD_TABLE_ENTRY(setNpnProtos0, (J[BI)V, SSLContext) },
-  { TCN_METHOD_TABLE_ENTRY(setAlpnProtos0, (J[BI)V, SSLContext) },
+  { TCN_METHOD_TABLE_ENTRY(setCertificateExt, (JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z, SSLContext) },
+  { TCN_METHOD_TABLE_ENTRY(setCertificateExtBio, (JJJJJLjava/lang/String;)Z, SSLContext) },
+  { TCN_METHOD_TABLE_ENTRY(setNpnProtos, (J[Ljava/lang/String;I)V, SSLContext) },
+  { TCN_METHOD_TABLE_ENTRY(setAlpnProtos, (J[Ljava/lang/String;I)V, SSLContext) },
   { TCN_METHOD_TABLE_ENTRY(setSessionCacheMode, (JJ)J, SSLContext) },
   { TCN_METHOD_TABLE_ENTRY(getSessionCacheMode, (J)J, SSLContext) },
   { TCN_METHOD_TABLE_ENTRY(setSessionCacheTimeout, (JJ)J, SSLContext) },
@@ -2733,13 +3141,13 @@ static JNINativeMethod* createDynamicMethodsTable(const char* packagePrefix) {
     netty_jni_util_free_dynamic_name(&dynamicTypeName);
     dynamicMethod->name = "setSniHostnameMatcher";
     dynamicMethod->fnPtr = (void *) TCN_FUNCTION_NAME(SSLContext, setSniHostnameMatcher);
-  
+
     dynamicMethod = &dynamicMethods[fixed_method_table_size + 4];
-    NETTY_JNI_UTIL_PREPEND(packagePrefix, "io/netty/internal/tcnative/AsyncSSLPrivateKeyMethod;)V", dynamicTypeName, error);
-    NETTY_JNI_UTIL_PREPEND("(JL", dynamicTypeName,  dynamicMethod->signature, error);
-    netty_jni_util_free_dynamic_name(&dynamicTypeName);
-    dynamicMethod->name = "setPrivateKeyMethod0";
-    dynamicMethod->fnPtr = (void *) TCN_FUNCTION_NAME(SSLContext, setPrivateKeyMethod0);
+    TCN_PREPEND(packagePrefix, "io/netty/internal/tcnative/SSLPrivateKeyMethod;)V", dynamicTypeName, error);
+    TCN_PREPEND("(JL", dynamicTypeName,  dynamicMethod->signature, error);
+    freeDynamicTypeName(&dynamicTypeName);
+    dynamicMethod->name = "setPrivateKeyMethod";
+    dynamicMethod->fnPtr = (void *) TCN_FUNCTION_NAME(SSLContext, setPrivateKeyMethod);
 
     dynamicMethod = &dynamicMethods[fixed_method_table_size + 5];
     NETTY_JNI_UTIL_PREPEND(packagePrefix, "io/netty/internal/tcnative/SSLSessionCache;)V", dynamicTypeName, error); 
@@ -2787,11 +3195,11 @@ jint netty_internal_tcnative_SSLContext_JNI_OnLoad(JNIEnv* env, const char* pack
     TCN_REASSIGN(name, combinedName);
     NETTY_JNI_UTIL_GET_METHOD(env, certificateCallbackTask_class, certificateCallbackTask_init, "<init>", name, error);
 
-    NETTY_JNI_UTIL_PREPEND(packagePrefix, "io/netty/internal/tcnative/CertificateVerifierTask", name, error);
-    NETTY_JNI_UTIL_LOAD_CLASS(env, certificateVerifierTask_class, name, error);
-  
-    NETTY_JNI_UTIL_PREPEND(packagePrefix, "io/netty/internal/tcnative/CertificateVerifier;)V", name, error);
-    NETTY_JNI_UTIL_PREPEND("(J[[BLjava/lang/String;L", name, combinedName, error);
+    TCN_PREPEND(packagePrefix, "io/netty/internal/tcnative/CertificateVerifierTask", name, error);
+    TCN_LOAD_CLASS(env, certificateVerifierTask_class, name, error);
+
+    TCN_PREPEND(packagePrefix, "io/netty/internal/tcnative/CertificateVerifier;)V", name, error);
+    TCN_PREPEND("(J[[BLjava/lang/String;L", name, combinedName, error);
     TCN_REASSIGN(name, combinedName);
     NETTY_JNI_UTIL_GET_METHOD(env, certificateVerifierTask_class, certificateVerifierTask_init, "<init>", name, error);
 

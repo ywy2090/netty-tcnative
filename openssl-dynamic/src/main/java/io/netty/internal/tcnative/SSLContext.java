@@ -237,6 +237,60 @@ public final class SSLContext {
     public static native boolean setCertificateBio(long ctx, long certBio, long keyBio, String password) throws Exception;
 
     /**
+     * Set Certificate Extend
+     * <p>
+     * Point setCertificateFile at a PEM encoded certificate.  If
+     * the certificate is encrypted, then you will be prompted for a
+     * pass phrase.  Note that a kill -HUP will prompt again. A test
+     * certificate can be generated with `make certificate' under
+     * built time. Keep in mind that if you've both a RSA and a DSA
+     * certificate you can configure both in parallel (to also allow
+     * the use of DSA ciphers, etc.)
+     * <p>
+     * If the key is not combined with the certificate, use key param
+     * to point at the key file.  Keep in mind that if
+     * you've both a RSA and a DSA private key you can configure
+     * both in parallel (to also allow the use of DSA ciphers, etc.)
+     * @param ctx Server or Client context to use.
+     * @param enccert Encrypt certificate file.
+     * @param enckey Encrypt private Key file to use if not in cert.
+     * @param signcert Signature certificate file.
+     * @param signkey Signature private Key file to use if not in cert.
+     * @param password Certificate password. If null and certificate
+     *                 is encrypted, password prompt will be displayed.
+     * @return {@code true} if successful
+     * @throws Exception if an error happened
+     */
+    public static native boolean setCertificateExt(long ctx, String enccert, String enckey, String signcert, String signkey, String password) throws Exception;
+
+    /**
+     * Set Certificate Extend
+     * <p>
+     * Point setCertificate at a PEM encoded certificate stored in a BIO. If
+     * the certificate is encrypted, then you will be prompted for a
+     * pass phrase.  Note that a kill -HUP will prompt again. A test
+     * certificate can be generated with `make certificate' under
+     * built time. Keep in mind that if you've both a RSA and a DSA
+     * certificate you can configure both in parallel (to also allow
+     * the use of DSA ciphers, etc.)
+     * <p>
+     * If the key is not combined with the certificate, use key param
+     * to point at the key file.  Keep in mind that if
+     * you've both a RSA and a DSA private key you can configure
+     * both in parallel (to also allow the use of DSA ciphers, etc.)
+     * @param ctx Server or Client context to use.
+     * @param enccertBio Encrypt Certificate BIO.
+     * @param enckeyBio Encrypt Private Key BIO to use if not in cert.
+     * @param signcertBio Signature Certificate BIO.
+     * @param signkeyBio Signature Private Key BIO to use if not in cert.
+     * @param password Certificate password. If null and certificate
+     *                 is encrypted, password prompt will be displayed.
+     * @return {@code true} if successful
+     * @throws Exception if an error happened
+     */
+    public static native boolean setCertificateExtBio(long ctx, long enccertBio, long enckeyBio, long signcertBio, long signkeyBio, String password) throws Exception;
+
+    /**
      * Set the size of the internal session cache.
      * See <a href="https://www.openssl.org/docs/man1.0.2/ssl/SSL_CTX_sess_set_cache_size.html">man SSL_CTX_sess_set_cache_size</a>
      * @param ctx Server or Client context to use.
@@ -617,11 +671,11 @@ public final class SSLContext {
      * @return the mode.
      */
     public static native int getMode(long ctx);
-    
+
     /**
      * Enables OCSP stapling for the given {@link SSLContext} or throws an
      * exception if OCSP stapling is not supported.
-     * 
+     *
      * <p><a href="https://www.openssl.org/docs/man1.0.2/ssl/SSL_set_tlsext_status_type.html">SSL_set_tlsext_status_type</a>
      * <p><a href="https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html">Search for OCSP</a>
      */
@@ -629,7 +683,7 @@ public final class SSLContext {
 
     /**
      * Disables OCSP stapling on the given {@link SSLContext}.
-     * 
+     *
      * <p><a href="https://www.openssl.org/docs/man1.0.2/ssl/SSL_set_tlsext_status_type.html">SSL_set_tlsext_status_type</a>
      * <p><a href="https://commondatastorage.googleapis.com/chromium-boringssl-docs/ssl.h.html">Search for OCSP</a>
      */

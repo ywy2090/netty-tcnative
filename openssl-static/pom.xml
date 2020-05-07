@@ -14,7 +14,8 @@
   ~ License for the specific language governing permissions and limitations
   ~ under the License.
   -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>io.netty</groupId>
@@ -31,8 +32,7 @@
   </description>
 
   <properties>
-    <opensslSourceDir>${project.build.directory}/openssl-source</opensslSourceDir>
-    <opensslHome>${project.build.directory}/openssl</opensslHome>
+    <opensslBuildDir>${project.build.directory}/TASSL-${opensslCommit}</opensslBuildDir>
     <linkStatic>true</linkStatic>
     <compileLibrary>true</compileLibrary>
     <!-- Don't deploy this artifact to Maven Central -->
@@ -122,7 +122,7 @@
                   <fileset dir="${nativeJarWorkdir}/META-INF/native/" />
                   <globmapper from="netty_tcnative.*" to="netty_tcnative_${os.detected.name}_${jniArch}.*" />
                 </move>
-                 
+
                 <jar destfile="${nativeJarFile}" manifest="${nativeJarWorkdir}/META-INF/MANIFEST.MF" basedir="${nativeJarWorkdir}" index="true" excludes="META-INF/MANIFEST.MF,META-INF/INDEX.LIST" />
                 <!-- Adjust the classifier used for different OS distributions which provide differently-built openSSL libraries -->
                 <condition property="classifier" value="${jniClassifier}-fedora">
@@ -209,28 +209,15 @@
                     <taskdef resource="net/sf/antcontrib/antcontrib.properties" />
 
                     <if>
-                      <available file="${opensslSourceDir}" />
+                      <available file="${project.build.directory}/openssl-${opensslVersion}.tar.gz" />
                       <then>
                         <echo message="OpenSSL was already downloaded, skipping the build step." />
                       </then>
                       <else>
                         <echo message="Downloading OpenSSL" />
 
-                        <condition property="opensslFound"> 
-                          <http url="https://www.openssl.org/source/openssl-${opensslVersion}.tar.gz" /> 
-                        </condition> 
-                         <if>
-                          <equals arg1="${opensslFound}" arg2="true" />
-                          <then>
-                            <!-- Download the openssl source. -->
-                            <get src="https://www.openssl.org/source/openssl-${opensslVersion}.tar.gz" dest="${project.build.directory}/openssl-${opensslVersion}.tar.gz" verbose="on" />
-                          </then>
-                          <else>
-                           <!-- Download the openssl source from the old directory -->
-                            <get src="https://www.openssl.org/source/old/${opensslMinorVersion}/openssl-${opensslVersion}.tar.gz" dest="${project.build.directory}/openssl-${opensslVersion}.tar.gz" verbose="on" />
-                          </else>
-                        </if>
-                        <checksum file="${project.build.directory}/openssl-${opensslVersion}.tar.gz" algorithm="SHA-256" property="${opensslSha256}" verifyProperty="isEqual" />
+                          <get src="https://github.com/jntass/TASSL/archive/${opensslCommit}.tar.gz" dest="${project.build.directory}/openssl-${opensslVersion}.tar.gz" verbose="on" />
+                          <checksum file="${project.build.directory}/openssl-${opensslVersion}.tar.gz" algorithm="SHA-256" property="${opensslSha256}" verifyProperty="isEqual" />
 
                         <gunzip src="${project.build.directory}/openssl-${opensslVersion}.tar.gz" dest="${project.build.directory}/" />
                         <untar src="${project.build.directory}/openssl-${opensslVersion}.tar" dest="${project.build.directory}/" />
@@ -319,34 +306,15 @@
                     <taskdef resource="net/sf/antcontrib/antcontrib.properties" />
 
                     <if>
-                      <available file="${opensslSourceDir}" />
+                      <available file="${project.build.directory}/openssl-${opensslVersion}.tar.gz" />
                       <then>
                         <echo message="OpenSSL was already downloaded, skipping the build step." />
                       </then>
                       <else>
                         <echo message="Downloading OpenSSL" />
 
-                        <condition property="opensslFound"> 
-                          <http url="https://www.openssl.org/source/openssl-${opensslVersion}.tar.gz" /> 
-                        </condition> 
-                         <if>
-                          <equals arg1="${opensslFound}" arg2="true" />
-                          <then>
-                            <!-- Download the openssl source. -->
-                            <get src="https://www.openssl.org/source/openssl-${opensslVersion}.tar.gz" dest="${project.build.directory}/openssl-${opensslVersion}.tar.gz" verbose="on" />
-                          </then>
-                          <else>
-                           <!-- Download the openssl source from the old directory -->
-                            <get src="https://www.openssl.org/source/old/${opensslMinorVersion}/openssl-${opensslVersion}.tar.gz" dest="${project.build.directory}/openssl-${opensslVersion}.tar.gz" verbose="on" />
-                          </else>
-                        </if>
-                        <checksum file="${project.build.directory}/openssl-${opensslVersion}.tar.gz" algorithm="SHA-256" property="${opensslSha256}" verifyProperty="isEqual" />
-
-                        <!-- Use the tar command (rather than the untar ant task) in order to preserve file permissions. -->
-                        <exec executable="tar" failonerror="true" dir="${project.build.directory}/" resolveexecutable="true">
-                           <arg line="xfvz openssl-${opensslVersion}.tar.gz" />
-                         </exec>
-                        <move file="${project.build.directory}/openssl-${opensslVersion}" tofile="${opensslSourceDir}" />
+                          <get src="https://github.com/jntass/TASSL/archive/${opensslCommit}.tar.gz" dest="${project.build.directory}/openssl-${opensslVersion}.tar.gz" verbose="on" />
+                          <checksum file="${project.build.directory}/openssl-${opensslVersion}.tar.gz" algorithm="SHA-256" property="${opensslSha256}" verifyProperty="isEqual" />
                       </else>
                     </if>
                   </target>
@@ -370,16 +338,21 @@
                         <echo message="OpenSSL was already build, skipping the build step." />
                       </then>
                       <else>
-                        <echo message="Building OpenSSL" />
-                        <mkdir dir="${opensslHome}" />
-                        <exec executable="config" failonerror="true" dir="${opensslSourceDir}" resolveexecutable="true">
-                          <arg line="-O3 -fno-omit-frame-pointer -fPIC no-ssl2 no-ssl3 no-shared no-comp -DOPENSSL_NO_HEARTBEATS --prefix=${opensslHome} --openssldir=${opensslHome}" />
+                        <echo message="Building OpenSSL install into ${sslHome}" />
+                        <!-- <mkdir dir="${sslHome}" /> -->
+                        <!-- Use the tar command (rather than the untar ant task) in order to preserve file permissions. -->
+                        <exec executable="tar" failonerror="true" dir="${project.build.directory}/" resolveexecutable="true">
+                          <arg line="xfvz openssl-${opensslVersion}.tar.gz" />
                         </exec>
-                        <exec executable="make" failonerror="true" dir="${opensslSourceDir}" resolveexecutable="true">
+                        <chmod file="${opensslBuildDir}/config" perm="ugo+rx"/>
+                        <exec executable="config" failonerror="true" dir="${opensslBuildDir}" resolveexecutable="true">
+                          <arg line="-O3 -fno-omit-frame-pointer -fPIC no-ssl2 no-ssl3 no-shared -DOPENSSL_NO_HEARTBEATS --prefix=${sslHome} --openssldir=${sslHome}" />
+                        </exec>
+                        <!-- <exec executable="make" failonerror="true" dir="${opensslBuildDir}" resolveexecutable="true">
                           <arg value="depend" />
-                        </exec>
-                        <exec executable="make" failonerror="true" dir="${opensslSourceDir}" resolveexecutable="true" />
-                        <exec executable="make" failonerror="true" dir="${opensslSourceDir}" resolveexecutable="true">
+                        </exec> -->
+                        <exec executable="make" failonerror="true" dir="${opensslBuildDir}" resolveexecutable="true" />
+                        <exec executable="make" failonerror="true" dir="${opensslBuildDir}" resolveexecutable="true">
                           <!-- Don't install manpages to make things as fast a possible -->
                           <arg value="install_sw" />
                         </exec>
@@ -417,34 +390,16 @@
                     <taskdef resource="net/sf/antcontrib/antcontrib.properties" />
 
                     <if>
-                      <available file="${opensslSourceDir}" />
+                      <available file="${project.build.directory}/openssl-${opensslVersion}.tar.gz" />
                       <then>
                         <echo message="OpenSSL was already downloaded, skipping the build step." />
                       </then>
                       <else>
                         <echo message="Downloading OpenSSL" />
 
-                        <condition property="opensslFound"> 
-                          <http url="https://www.openssl.org/source/openssl-${opensslVersion}.tar.gz" /> 
-                        </condition> 
-                         <if>
-                          <equals arg1="${opensslFound}" arg2="true" />
-                          <then>
-                            <!-- Download the openssl source. -->
-                            <get src="https://www.openssl.org/source/openssl-${opensslVersion}.tar.gz" dest="${project.build.directory}/openssl-${opensslVersion}.tar.gz" verbose="on" />
-                          </then>
-                          <else>
-                           <!-- Download the openssl source from the old directory -->
-                            <get src="https://www.openssl.org/source/old/${opensslMinorVersion}/openssl-${opensslVersion}.tar.gz" dest="${project.build.directory}/openssl-${opensslVersion}.tar.gz" verbose="on" />
-                          </else>
-                        </if>
-                        <checksum file="${project.build.directory}/openssl-${opensslVersion}.tar.gz" algorithm="SHA-256" property="${opensslSha256}" verifyProperty="isEqual" />
+                          <get src="https://github.com/jntass/TASSL/archive/${opensslCommit}.tar.gz" dest="${project.build.directory}/openssl-${opensslVersion}.tar.gz" verbose="on" />
+                          <checksum file="${project.build.directory}/openssl-${opensslVersion}.tar.gz" algorithm="SHA-256" property="${opensslSha256}" verifyProperty="isEqual" />
 
-                        <!-- Use the tar command (rather than the untar ant task) in order to preserve file permissions. -->
-                        <exec executable="tar" failonerror="true" dir="${project.build.directory}/" resolveexecutable="true">
-                           <arg line="xfvz openssl-${opensslVersion}.tar.gz" />
-                         </exec>
-                        <move file="${project.build.directory}/openssl-${opensslVersion}" tofile="${opensslSourceDir}" />
                       </else>
                     </if>
                   </target>
@@ -468,15 +423,20 @@
                       </then>
                       <else>
                         <echo message="Building OpenSSL" />
-                        <mkdir dir="${opensslHome}" />
-                        <exec executable="Configure" failonerror="true" dir="${opensslSourceDir}" resolveexecutable="true">
-                          <arg line="darwin64-x86_64-cc -O3 -fno-omit-frame-pointer -fPIC no-ssl2 no-ssl3 no-shared no-comp -DOPENSSL_NO_HEARTBEATS --prefix=${opensslHome} --openssldir=${opensslHome} ${macOsxDeploymentTarget}" />
+                        <!-- <mkdir dir="${sslHome}" /> -->
+                        <!-- Use the tar command (rather than the untar ant task) in order to preserve file permissions. -->
+                        <exec executable="tar" failonerror="true" dir="${project.build.directory}/" resolveexecutable="true">
+                          <arg line="xfvz openssl-${opensslVersion}.tar.gz" />
                         </exec>
-                        <exec executable="make" failonerror="true" dir="${opensslSourceDir}" resolveexecutable="true">
+                        <chmod file="${opensslBuildDir}/Configure" perm="ugo+rx"/>
+                        <exec executable="Configure" failonerror="true" dir="${opensslBuildDir}" resolveexecutable="true">
+                          <arg line="darwin64-x86_64-cc -O3 -fno-omit-frame-pointer -fPIC no-ssl2 no-ssl3 no-shared -DOPENSSL_NO_HEARTBEATS --prefix=${sslHome} --openssldir=${sslHome}" />
+                        </exec>
+                        <!-- <exec executable="make" failonerror="true" dir="${opensslBuildDir}" resolveexecutable="true">
                           <arg value="depend" />
-                        </exec>
-                        <exec executable="make" failonerror="true" dir="${opensslSourceDir}" resolveexecutable="true" />
-                        <exec executable="make" failonerror="true" dir="${opensslSourceDir}" resolveexecutable="true">
+                        </exec> -->
+                        <exec executable="make" failonerror="true" dir="${opensslBuildDir}" resolveexecutable="true" />
+                        <exec executable="make" failonerror="true" dir="${opensslBuildDir}" resolveexecutable="true">
                           <!-- Don't install manpages to make things as fast a possible -->
                           <arg value="install_sw" />
                         </exec>

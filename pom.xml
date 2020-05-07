@@ -14,7 +14,8 @@
   ~ License for the specific language governing permissions and limitations
   ~ under the License.
   -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.sonatype.oss</groupId>
@@ -44,8 +45,8 @@
     <maven.javadoc.failOnError>false</maven.javadoc.failOnError>
     <checkstyle.skip>true</checkstyle.skip>
     <enforcer.plugin.version>1.4.1</enforcer.plugin.version>
-    <maven.compiler.source>1.6</maven.compiler.source>
-    <maven.compiler.target>1.6</maven.compiler.target>
+    <maven.compiler.source>1.7</maven.compiler.source>
+    <maven.compiler.target>1.7</maven.compiler.target>
     <netty.build.version>29</netty.build.version>
     <animal.sniffer.skip>true</animal.sniffer.skip>
     <forceAutogen>false</forceAutogen>
@@ -68,11 +69,12 @@
     <!--
       See https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/SHA256 for the SHA256 signature
     -->
-    <libresslSha256>414c149c9963983f805a081db5bd3aec146b5f82d529bb63875ac941b25dcbb6</libresslSha256>
-    <opensslMinorVersion>1.1.1</opensslMinorVersion>
-    <opensslPatchVersion>k</opensslPatchVersion>
+    <libresslSha256>df7b172bf79b957dd27ef36dcaa1fb162562c0e8999e194aa8c1a3df2f15398e</libresslSha256>
+    <opensslMinorVersion>1.0.2</opensslMinorVersion>
+    <opensslPatchVersion>o</opensslPatchVersion>
     <opensslVersion>${opensslMinorVersion}${opensslPatchVersion}</opensslVersion>
-    <opensslSha256>892a0875b9872acd04a9fde79b1f943075d5ea162415de3047c327df33fbaee5</opensslSha256>
+    <opensslCommit>ccdfc64c5f56988f76abc0390a12ed9865bc49e9</opensslCommit>
+    <opensslSha256>534c3ba12a75e6eb87aef4b86967c55a8845edd9e22be95ded27d1abd853f160</opensslSha256>
     <aprHome>${project.build.directory}/apr</aprHome>
     <aprSourceDir>${project.build.directory}/apr-source</aprSourceDir>
     <aprPatchFile>r1871981-macos11.patch</aprPatchFile>
@@ -700,7 +702,7 @@
       <modules>
         <!-- When doing a release we only want to deploy dynamic openssl version and the static boring one. -->
         <module>openssl-dynamic</module>
-        <module>boringssl-static</module>
+        <module>openssl-static</module>
       </modules>
     </profile>
 
@@ -725,10 +727,10 @@
         </property>
       </activation>
       <modules>
-        <module>openssl-dynamic</module>
+        <!-- <module>openssl-dynamic</module> -->
         <module>openssl-static</module>
-        <module>boringssl-static</module>
-        <module>libressl-static</module>
+        <!-- <module>boringssl-static</module> -->
+        <!-- <module>libressl-static</module> -->
       </modules>
     </profile>
 
