@@ -1184,6 +1184,7 @@ TCN_IMPLEMENT_CALL(jboolean, SSLContext, setCertificateExtBio)(TCN_STDARGS, jlon
         rv = JNI_FALSE;
         goto cleanup;
     }
+#if 0
     if ((xsigncert = PEM_read_bio_X509(sign_cert_bio, NULL, NULL, NULL)) == NULL) {
         ERR_error_string(ERR_get_error(), err);
         ERR_clear_error();
@@ -1199,6 +1200,75 @@ TCN_IMPLEMENT_CALL(jboolean, SSLContext, setCertificateExtBio)(TCN_STDARGS, jlon
         rv = JNI_FALSE;
         goto cleanup;
     }
+#endif
+
+    // code from https://stackoverflow.com/questions/3810058/read-certificate-files-from-memory-instead-of-a-file-using-openssl
+    X509_INFO *itmp;
+    STACK_OF(X509_INFO) *inf = PEM_X509_INFO_read_bio(sign_cert_bio, NULL, NULL, NULL);
+
+    if (!inf)
+    {
+        ERR_error_string(ERR_get_error(), err);
+        ERR_clear_error();
+        tcn_Throw(e, "Unable read X509_INFO from sign_cert_bio (%s)",err);
+        rv = JNI_FALSE;
+        goto cleanup;
+    }
+    /* Iterate over contents of the PEM buffer, and add certs. */
+    bool first = true;
+    for (int i = 0; i < sk_X509_INFO_num(inf); i++) {
+        itmp = sk_X509_INFO_value(inf, i);
+        if (itmp->x509)
+        {
+            /* First cert is server cert. Remaining, if any, are intermediate certs. */
+            if (first)
+            {
+                first = false;
+                /*
+                 * Set server certificate. Note that this operation increments the
+                 * reference count, which means that it is okay for cleanup to free it.
+                 */
+                if (!SSL_CTX_use_certificate(c->ctx, itmp->x509))
+                {
+                    ERR_error_string(ERR_get_error(), err);
+                    ERR_clear_error();
+                    tcn_Throw(e, "Unable SSL_CTX_use_certificate (%s)",err);
+                    rv = JNI_FALSE;
+                    goto cleanup;
+                }
+
+                if (ERR_peek_error() != 0)
+                {
+                    ERR_error_string(ERR_get_error(), err);
+                    ERR_clear_error();
+                    tcn_Throw(e, "ERR_peek_error (%s)",err);
+                    rv = JNI_FALSE;
+                    goto cleanup;
+                }
+                /* Get ready to store intermediate certs, if any. */
+                SSL_CTX_clear_chain_certs(c->ctx);
+            }
+            else
+            {
+                /* Add intermediate cert to chain. */
+                if (!SSL_CTX_add0_chain_cert(c->ctx, itmp->x509))
+                {
+                    ERR_error_string(ERR_get_error(), err);
+                    ERR_clear_error();
+                    tcn_Throw(e, "Unable to SSL_CTX_add0_chain_cert (%s)",err);
+                    rv = JNI_FALSE;
+                    goto cleanup;
+                }
+
+                /*
+                 * Above function doesn't increment cert reference count. NULL the info
+                 * reference to it in order to prevent it from being freed during cleanup.
+                 */
+                itmp->x509 = NULL;
+            }
+        }
+    }
+
     if (SSL_CTX_use_PrivateKey(c->ctx, psignkey) <= 0) {
         ERR_error_string(ERR_get_error(), err);
         ERR_clear_error();
@@ -1237,6 +1307,7 @@ cleanup:
     EVP_PKEY_free(psignkey); // this function is safe to call with NULL
     X509_free(xsigncert); // this function is safe to call with NULL
     free_and_reset_pass(c, old_password, rv);
+    sk_X509_INFO_pop_free(inf, X509_INFO_free);
     return rv;
 }
 
