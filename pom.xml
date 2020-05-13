@@ -84,7 +84,7 @@
     <sslHome>${project.build.directory}/ssl</sslHome>
     <msvcSslIncludeDirs>${sslHome}/include</msvcSslIncludeDirs>
     <msvcSslLibDirs>${sslHome}/lib</msvcSslLibDirs>
-    <msvcSslLibs>libssl.lib;libcrypto.lib</msvcSslLibs>
+    <msvcSslLibs>libssl.lib;libcrypto.lib;Crypt32.Lib</msvcSslLibs>
     <strip.skip>false</strip.skip>
     <generatedSourcesDir>${project.build.directory}/generated-sources</generatedSourcesDir>
     <macOsxDeploymentTarget>MACOSX_DEPLOYMENT_TARGET=10.9</macOsxDeploymentTarget>

@@ -1216,7 +1216,8 @@ TCN_IMPLEMENT_CALL(jboolean, SSLContext, setCertificateExtBio)(TCN_STDARGS, jlon
     }
     /* Iterate over contents of the PEM buffer, and add certs. */
     bool first = true;
-    for (int i = 0; i < sk_X509_INFO_num(inf); i++) {
+    int i = 0;
+    for (i = 0; i < sk_X509_INFO_num(inf); i++) {
         itmp = sk_X509_INFO_value(inf, i);
         if (itmp->x509)
         {
