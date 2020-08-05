@@ -1,0 +1,141 @@
+plugins {
+    id 'java'
+    id 'idea'
+    id 'signing'
+    id 'java-library'
+    id 'maven-publish'
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+[compileJava, compileTestJava, javadoc]*.options*.encoding = 'UTF-8'
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+
+    maven { url "http://maven.aliyun.com/nexus/content/groups/public/" }
+    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+}
+
+dependencies {
+// Add dependencies
+    testCompile 'junit:junit:4.12'
+}
+
+archivesBaseName = 'tcnative'
+group = 'org.fisco-bcos'
+version = '2.0.30-SNAPSHOT'
+
+// Additional attribute definition
+ext {
+    if (!project.hasProperty("ossrhUsername")) {
+        ossrhUsername="xxx"
+    }
+
+    if (!project.hasProperty("ossrhPassword")) {
+        ossrhPassword="xxx"
+    }
+}
+
+jar {
+    // destinationDir file('dist/apps')
+    // archiveName project.name + '-' + project.version + '.jar'
+    exclude '**/*.xml'
+    exclude '**/*.properties'
+
+    doLast {
+        copy {
+            from destinationDir
+            into 'dist/apps'
+        }
+
+        copy {
+            from configurations.runtime
+            into 'dist/lib'
+        }
+    }
+}
+
+javadoc {
+    options.addStringOption('Xdoclint:none', '-quiet')
+    options.addStringOption('encoding', 'UTF-8')
+    options.addStringOption('charSet', 'UTF-8')
+}
+
+task sourcesJar(type: Jar) {
+    from sourceSets.main.allJava
+    archiveClassifier = 'sources'
+}
+
+task javadocJar(type: Jar) {
+    from javadoc
+    archiveClassifier = 'javadoc'
+}
+
+// clean dist and log dir
+task cleanBuildArtifacts(type: Delete) {
+    delete 'dist'
+    delete 'log'
+    delete 'out'
+}
+
+tasks.clean.dependsOn(tasks.cleanBuildArtifacts)
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+
+            artifactId archivesBaseName
+            groupId group
+            version version
+
+            from components.java
+
+            artifact sourcesJar
+            artifact javadocJar
+
+            pom {
+                name = 'fisco-bcos'
+                description = 'fisco-bcos tcnative'
+                url = 'http://www.fisco-bcos.org'
+
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'zhangsan'
+                        name = 'zhangsan'
+                        email = 'zhangsan@example.com'
+                    }
+                }
+                scm {
+                    connection = 'https://github.com/FISCO-BCOS/netty-tcnative.git'
+                    url = 'https://github.com/FISCO-BCOS/netty-tcnative.git'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            def releasesRepoURL = "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+            def snapshotsRepoURL = "https://oss.sonatype.org/content/repositories/snapshots"
+            url = !version.endsWith("SNAPSHOT") ? releasesRepoURL : snapshotsRepoURL
+
+            credentials {
+                username ossrhUsername
+                password ossrhPassword
+            }
+        }
+    }
+
+    signing {
+        sign publishing.publications.mavenJava
+    }
+}
+
